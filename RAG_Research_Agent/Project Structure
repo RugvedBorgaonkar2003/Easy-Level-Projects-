@@ -1,0 +1,16 @@
+research-assistant/
+├── requirements.txt
+├── app.py                 # Streamlit frontend
+├── rag_agent.py          # Core RAG logic
+├── utils/
+│   ├── __init__.py
+│   ├── pdf_processor.py  # PDF parsing & chunking
+│   ├── multimodal.py     # Image/table extraction & analysis
+│   ├── visualizer.py     # Chart generation
+│   └── vector_store.py   # Vector DB operations
+├── data/
+│   ├── uploads/          # User uploaded PDFs
+│   ├── processed/        # Extracted images/tables
+│   └── vectordb/         # ChromaDB storage
+├── .env                  # API keys
+└── README.md

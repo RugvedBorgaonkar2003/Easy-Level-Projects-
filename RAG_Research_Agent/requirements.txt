@@ -1,0 +1,27 @@
+#core framework
+streamlit
+
+#Local LLM
+ollama
+    
+#Rag Componenets
+langchain
+langchain-community
+sentence-transformers
+
+#Vector Store(local)
+chromadb
+
+#PDF Processing
+pymupdf
+pdfplumber
+#Data and visualization
+pandas
+plotly
+numpy
+
+#Image Processing
+Pillow
+
+#Environment Variables
+python-dotenv
