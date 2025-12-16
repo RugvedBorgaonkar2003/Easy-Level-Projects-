@@ -455,30 +455,30 @@ class PDFProcessor:
     
     #Lets build extract headings function
 
-    def _extract_headings(self, text_blocks:List[Dict])-> List[Dict]:
-
+    def _extract_headings(self, text_blocks: List[Dict]) -> List[str]:
         """
-        Extract all headings from text blocks
-        ARGS : text_blocks: list of text blocks from _extract_text_with_structure()
-        return :
-        List of headings with metadata
-        [
-            {
-                'heading': 'Introduction',
-                'page': 1,
-                'section': 'introduction'
-            },
-            ...
-        ]
+        Extract all headings from text blocks for dropdown filter
+        
+        Args:
+            text_blocks: List of text blocks from _extract_text_with_structure()
+            
+        Returns:
+            List of unique heading strings
+            ['All Headings', 'Introduction', 'Methods', 'Results', ...]
         """
-        headings = []
+        headings = ['All Headings']  # Default option
+        
+        seen_headings = set()  # Track duplicates
+        
         for block in text_blocks:
-            if block.get("is_heading",False):
-                headings.append({
-                    'heading': block['text'],
-                    'page': block['page'],
-                    'section': block['section']
-                })
+            if block.get('is_heading', False):
+                heading_text = block['text'].strip()
+                
+                # Avoid duplicates (some PDFs repeat headings)
+                if heading_text and heading_text not in seen_headings:
+                    headings.append(heading_text)
+                    seen_headings.add(heading_text)
+        
         return headings
             
 
