@@ -1,4 +1,8 @@
 import streamlit as st
+from utils.vector_store import VectorStore
+from utils.pdf_processor import PDFProcessor
+from rag_agent import RAGAgent
+
 
 #page config
 st.set_page_config(
@@ -70,6 +74,101 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+#initialize componenets(only once per session)
+@st.cache_resource
+def initialize_components():
+    """Initialize PDF processor, vector store, and RAG agent"""
+    print("🔧 Initializing components...")
+
+    #initialize pdf processor
+    pdf_processor = PDFProcessor(chunk_size=500)
+
+    #initialize vector store
+    vector_store = VectorStore(
+        persist_directory="./data/vectordb",
+        collection_name="research_papers",
+        embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+    )
+
+    rag_agent = RAGAgent(
+        vector_store=vector_store,
+        llm_model="llama3.2:3b",
+        temperature = 0.7
+    )
+
+    print("✅ All components initialized!")
+    return pdf_processor, vector_store, rag_agent
+#load components
+pdf_processor, vector_store, rag_agent = initialize_components()
+
+
+def get_active_filters():
+    """Get active filters from sidebar checkboxes"""
+    filters = {}
+    
+    # Collect selected sections
+    selected_sections = []
+    
+    # You'll need to store these in session state from sidebar
+    # For now, return None (no filters)
+    # We'll enhance this after basic version works
+    
+    return None  # No filters for now, add later
+
+#document processing function
+def process_documents(files):
+    """Process uploaded documents and add to vector store"""
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    total_files = len(files)
+    for idx, file in enumerate(files):
+        #udate progress
+
+        progress = (idx + 1) / total_files
+        progress_bar.progress(progress)
+        status_text.text(f"Processing file {idx + 1} of {total_files}: {file.name}")
+
+        try:
+            #only process pdf for now
+            
+            if not file.name.lower().endswith('.pdf'):
+                st.warning(f"⚠️ Skipping {file.name} - Only PDFs supported in v1")
+                continue
+            #process pdf
+
+            with st.spinner(f"📖 Extracting content from {file.name}..."):
+                result = pdf_processor.process_pdf(file)
+            
+            #Add chunks to vector store
+            with st.spinner(f"💾 Storing {file.name} in database..."):
+                num_chunks = vector_store.add_chunks(
+                    chunks = result['chunks'],
+                    file_name = file.name)
+                
+            #mark as processed
+            st.session_state.processed_files.add(file.name) 
+
+            #show success
+            st.success(f"✅ {file.name}: Processed {num_chunks} chunks, {len(result['images'])} images, {len(result['tables'])} tables")
+
+        except Exception as e:
+            st.error(f"❌ Error processing {file.name}: {str(e)}")
+            continue
+
+#session state for tracking processed files
+if "processed_files" not in st.session_state:
+    st.session_state.processed_files = set()
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role" : "assistant",
+            'content': 'Hello! 👋 Upload your research papers and ask me anything!'
+        }
+    ]
 
 #Intialize Chat history with welcome message and tools menu session state
 if "show_tools_menu" not in st.session_state:
@@ -145,7 +244,7 @@ uploaded_files = st.file_uploader (
     type = ["pdf", "docx", "txt", "png", "jpg", "jpeg"],
     accept_multiple_files = True
 )
-
+files_to_process = []
 #Display uploaded files
 if uploaded_files:
     st.success(f"✅Uploaded {len(uploaded_files)} file(s) successfully!")
@@ -155,6 +254,19 @@ if uploaded_files:
         else:
             icon = "📄"
         st.write(f"{icon} {file.name}") 
+
+        #check if file already processed
+        if file.name in st.session_state.processed_files:
+            st.write(f"{icon} {file.name} ✅ *Processed*")
+        else:
+            st.write(f"{icon} {file.name} ⏳ *Ready to process*")
+            files_to_process.append(file)
+        
+        #process new files
+        if files_to_process:
+            if st.button("Process New Files", type = "primary"):
+                process_documents(files_to_process)
+         
 
 st.divider()
 
@@ -173,9 +285,28 @@ if user_question:
         "content" : user_question
     })
 
-    #assistant response (placeholder)
-    response = f"You asked: '{user_question}'. Once we connect the RAG backend, I'll answer from your papers!"
+#check if documents are processed
+    if not  st.session_state.processed_files:
+        response = "⚠️ Please upload and process some documents first before asking questions!"
+    else:
+        #get answer from RAG agent
 
+        with st.spinner("🤔 Thinking..."):
+            
+            filters = get_active_filters()
+            result = rag_agent.answer_question(
+                question = user_question,
+                n_chunks =3,
+                filters = filters)
+            
+            #format response
+            response = result['answer']
+
+            #add sources if any
+            if result['sources']:
+                response += "\n\n" + rag_agent._format_sources(result['sources'])
+        
+    #append assistant response to chat history
     st.session_state.messages.append({
         "role" : "assistant",
         "content" : response
@@ -241,5 +372,5 @@ with st.sidebar:
     
     if st.button("Create Study Notes", use_container_width=True):
         handle_learning_tools("notes")
-        st.rerun()
+        st.rerun()  
     

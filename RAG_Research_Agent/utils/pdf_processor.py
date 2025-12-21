@@ -61,7 +61,7 @@ class PDFProcessor:
         tables = self._extract_tables(pdf_bytes)
 
         #create chunks with metadata
-        chunks = self._create_chunks_with_metadata(text_data)
+        chunks = self._create_chunks(text_data)
 
         #extract all headings for dropdown
         headings = self._extract_headings(text_data)
@@ -183,7 +183,7 @@ class PDFProcessor:
             }]
         """
         #opening pdf
-        doc = pymupdf.open(stream=pdf_bytes,file_type = "pdf")
+        doc = pymupdf.open(stream=pdf_bytes,filetype = "pdf")
         images = []
 
         for page_num,page in enumerate(doc, start=1):
@@ -235,7 +235,7 @@ class PDFProcessor:
         """
         search_area = pymupdf.Rect(
             img_rect.x0,
-            img_rect.xy,
+            img_rect.y1,
             img_rect.x1,
             img_rect.y1 + 50  #50 pixels below image    
 
@@ -321,7 +321,7 @@ class PDFProcessor:
         """
 
         #get all the text on page
-        text = page.get_text()
+        text = page.extract_text()
 
         if not text:
             return None
@@ -351,7 +351,7 @@ class PDFProcessor:
                         next_line = lines[i+1].strip()
 
                         #if next line is short , it's part of caption
-                        if len(next_line)<100 and not next_line.startwith("Table"):
+                        if len(next_line)<100 and not next_line.startswith("Table"):
                             caption += " "+next_line
                     return caption
         return None
@@ -414,7 +414,7 @@ class PDFProcessor:
 
             #check if chunk size exceeding 500 or not
 
-            if current_word_count + block_word> self.chunks_size and current_chunk_text:
+            if current_word_count + block_word> self.chunk_size and current_chunk_text:
                 #create chunk
                 chunk_text = " ".join(current_chunk_text)
 
